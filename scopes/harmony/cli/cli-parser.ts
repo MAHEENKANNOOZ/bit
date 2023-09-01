@@ -18,7 +18,14 @@ export class CLIParser {
   constructor(private commands: Command[], private groups: GroupsType) {}
 
   async parse(args = process.argv.slice(2)) {
-    await this.throwForNonExistsCommand(args[0], args);
+    try {
+      await this.throwForNonExistsCommand(args[0], args);
+      // ... rest of the code
+    } catch (error) {
+      if (error.message !== 'Command was corrected and reparsed') {
+        throw error;
+      }
+    }
     logger.debug(`[+] CLI-INPUT: ${args.join(' ')}`);
     yargs(args);
     yargs.help(false);
