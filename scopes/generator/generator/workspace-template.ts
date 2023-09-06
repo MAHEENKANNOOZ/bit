@@ -1,5 +1,5 @@
 import type { Component } from '@teambit/component';
-import { ComponentConfig } from './component-template';
+import { BaseComponentTemplateOptions, ComponentConfig } from './component-template';
 
 /**
  * BaseWorkspaceOptions describes the foundational properties for workspaces.
@@ -142,4 +142,8 @@ export interface WorkspaceTemplate {
    * change their source code and update the dependency names according to the new component names.
    */
   fork?: (context: WorkspaceContext) => ForkComponentInfo[];
+  /**
+   * create new components from the workspace template itself or from other envs.
+   */
+  create?: BaseComponentTemplateOptions[];
 }
