@@ -1,5 +1,6 @@
 import type { Component } from '@teambit/component';
 import { BaseComponentTemplateOptions, ComponentConfig } from './component-template';
+import { CreateOptions } from './create.cmd';
 
 /**
  * BaseWorkspaceOptions describes the foundational properties for workspaces.
@@ -43,6 +44,11 @@ export interface BaseWorkspaceOptions {
    * Useful during the development of a workspace-template.
    */
   loadFrom?: string;
+
+  /**
+   * array of component templates to create in the workspace.
+   */
+  create?: BaseComponentTemplateOptions[];
 }
 
 /**
@@ -80,6 +86,12 @@ export interface ForkComponentInfo extends ImportComponentInfo {
    * },
    */
   config?: ComponentConfig;
+}
+
+export interface CreateComponentInfo {
+  componentNames: string[];
+  templateName: string;
+  options: CreateOptions;
 }
 
 /**
@@ -145,5 +157,5 @@ export interface WorkspaceTemplate {
   /**
    * create new components from the workspace template itself or from other envs.
    */
-  create?: BaseComponentTemplateOptions[];
+  create?: CreateComponentInfo[];
 }

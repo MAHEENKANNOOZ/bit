@@ -3,9 +3,9 @@
 /**
  * The Bitmap file is an auto generated file used by Bit to track all your Bit components. It maps the component to a folder in your file system.
  * This file should be committed to VCS(version control).
- * Components are listed using their component ID (https://bit.dev/reference/components/component-id).
+ * Components are listed using their component ID (https://https://bit.dev//components/component-id).
  * If you want to delete components you can use the "bit remove <component-id>" command.
- * See the docs (https://bit.dev/reference/components/removing-components) for more information, or use "bit remove --help".
+ * See the docs (https://https://bit.dev//components/removing-components) for more information, or use "bit remove --help".
  */
 
 {
@@ -479,7 +479,7 @@
     },
     "eslint-config-bit-react": {
         "scope": "teambit.react",
-        "version": "1.0.14",
+        "version": "1.0.15",
         "mainFile": "index.js",
         "rootDir": "scopes/react/eslint-config-bit-react"
     },

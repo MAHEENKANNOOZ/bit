@@ -293,9 +293,7 @@ export class GeneratorMain {
     if (!this.workspace) throw new OutsideWorkspaceError();
     await this.loadAspects();
     const { namespace, aspect } = options;
-
     const componentConfigLoadingRegistry = ComponentConfig.componentConfigLoadingRegistry;
-
     const templateWithId = await this.getComponentTemplate(templateName, aspect);
 
     ComponentConfig.componentConfigLoadingRegistry = componentConfigLoadingRegistry;
@@ -337,7 +335,7 @@ export class GeneratorMain {
       : await this.getWorkspaceTemplate(templateName, aspectId);
 
     if (!workspaceTemplate) throw new BitError(`template "${templateName}" was not found`);
-    const workspaceGenerator = new WorkspaceGenerator(workspaceName, options, workspaceTemplate, aspect);
+    const workspaceGenerator = new WorkspaceGenerator(workspaceName, options, workspaceTemplate, aspect, bind(this));
     const workspacePath = await workspaceGenerator.generate();
     return { workspacePath, appName: workspaceTemplate.appName };
   }

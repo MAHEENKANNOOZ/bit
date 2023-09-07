@@ -8,9 +8,6 @@ import UIAspect, { UiMain } from '@teambit/ui';
 import { Logger, LoggerAspect, LoggerMain } from '@teambit/logger';
 import { WorkspaceAspect, Workspace } from '@teambit/workspace';
 import ForkingAspect, { ForkingMain } from '@teambit/forking';
-import EnvsAspect, { EnvsMain } from '@teambit/envs';
-import TrackerAspect, { TrackerMain } from '@teambit/tracker';
-import NewComponentHelperAspect, { NewComponentHelperMain } from '@teambit/new-component-helper';
 import { init } from '@teambit/legacy/dist/api/consumer';
 import ImporterAspect, { ImporterMain } from '@teambit/importer';
 import { CompilerAspect, CompilerMain } from '@teambit/compiler';
@@ -20,12 +17,12 @@ import { resolve, join } from 'path';
 import { ComponentID } from '@teambit/component-id';
 import GitAspect, { GitMain } from '@teambit/git';
 import { InstallAspect, InstallMain } from '@teambit/install';
+import type { ComponentMain } from '@teambit/component';
+import { AspectLoaderMain } from '@teambit/aspect-loader';
 import WorkspaceConfigFilesAspect, { WorkspaceConfigFilesMain } from '@teambit/workspace-config-files';
-import { ComponentGenerator } from './component-generator';
 import { WorkspaceTemplate, WorkspaceContext } from './workspace-template';
 import { NewOptions } from './new.cmd';
-import { GeneratorAspect } from './generator.aspect';
-import { OnComponentCreateSlot } from './generator.main.runtime';
+import { GeneratorMain } from './generator.main.runtime';
 
 export type GenerateResult = { id: ComponentID; dir: string; files: string[]; envId: string };
 
@@ -39,16 +36,13 @@ export class WorkspaceGenerator {
   private forking: ForkingMain;
   private git: GitMain;
   private wsConfigFiles: WorkspaceConfigFilesMain;
-  private componentGenerators?: ComponentGenerator[] = [];
-  private envs?: EnvsMain;
-  private tracker?: TrackerMain;
-  private newComponentHelper?: NewComponentHelperMain;
 
   constructor(
     private workspaceName: string,
     private options: NewOptions,
     private template: WorkspaceTemplate,
-    private aspectComponent?: Component
+    private aspectComponent?: Component,
+    private generator?: GeneratorMain
   ) {
     this.workspacePath = resolve(this.workspaceName);
   }
@@ -70,29 +64,12 @@ export class WorkspaceGenerator {
       await this.setupGitBitmapMergeDriver();
       await this.forkComponentsFromRemote();
       await this.importComponentsFromRemote();
+      if (this.template.create && this.generator) {
+        const promises = this.template?.create?.map(({ componentNames, templateName, options }) =>
+          this.generator?.generateComponentTemplate(componentNames, templateName, options)
+        );
 
-      if (this.template.create) {
-        this.template.create.forEach((componentGenerator) => {
-          this.componentGenerator = new ComponentGenerator(
-            this.workspace,
-            componentGenerator.componentIds,
-            this.options,
-            componentGenerator.template,
-            this.envs,
-            this.newComponentHelper,
-            this.tracker,
-            this.wsConfigFiles,
-            this.logger,
-            {} as OnComponentCreateSlot,
-            this.aspectComponent || componentGenerator.aspectId,
-            this.aspectComponent || componentGenerator.env
-          );
-          this.componentGenerators.push(this.componentGenerator);
-        });
-
-        for (const componentGenerator of this.componentGenerators) {
-          await componentGenerator.generate();
-        }
+        await Promise.all(promises);
       }
       await this.workspace.clearCache();
       await this.install.install(undefined, {
@@ -173,11 +150,6 @@ export class WorkspaceGenerator {
     this.forking = this.harmony.get<ForkingMain>(ForkingAspect.id);
     this.git = this.harmony.get<GitMain>(GitAspect.id);
     this.wsConfigFiles = this.harmony.get<WorkspaceConfigFilesMain>(WorkspaceConfigFilesAspect.id);
-    if (this.template.create) {
-      this.envs = this.harmony.get<EnvsMain>(EnvsAspect.id);
-      this.tracker = this.harmony.get<TrackerMain>(TrackerAspect.id);
-      this.newComponentHelper = this.harmony.get<NewComponentHelperMain>(NewComponentHelperAspect.id);
-    }
   }
 
   private async forkComponentsFromRemote() {
