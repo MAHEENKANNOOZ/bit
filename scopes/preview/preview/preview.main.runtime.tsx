@@ -622,8 +622,14 @@ export class PreviewMain {
   }
 
   private writePreviewEntry(customAspects: AspectDefinition[] = []) {
+    // TODO: check the availablility and validity of the preview pre-bundle
+    // - get preview bundle context
+    // - set rebuild flag necessarily
+    // - build
+    // - get the preview bundle path
     const previewPathFromBvm = getAspectDirFromBvm(PreviewAspect.id);
     const previewArtifactPath = getBundleArtifactDirectory(PRE_BUNDLE_PREVIEW_DIR, '');
+    // TODO: to be customizable to like `<workspace-root>/public/preview`
     const previewPreBundlePath = join(previewPathFromBvm, previewArtifactPath);
     const manifestPath = join(previewPreBundlePath, 'asset-manifest.json');
     const manifest = readJsonSync(manifestPath);

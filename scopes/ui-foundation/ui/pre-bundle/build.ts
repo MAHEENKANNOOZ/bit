@@ -1,15 +1,12 @@
 import webpack from 'webpack';
 import { join, resolve } from 'path';
-import { existsSync, outputFileSync, pathExistsSync } from 'fs-extra';
+import { existsSync, pathExistsSync } from 'fs-extra';
 import { promisify } from 'util';
 import chalk from 'chalk';
 import { CacheMain } from '@teambit/cache';
 import { Logger } from '@teambit/logger';
-import { AspectDefinition } from '@teambit/aspect-loader';
-import { sha1 } from '@teambit/legacy/dist/utils';
 
 import { UIRoot } from '../ui-root';
-import { createRoot } from '../create-root';
 import { clearConsole, createBundleHash, readBundleHash } from './util';
 import { UnknownBuildError } from '../exceptions';
 
@@ -32,7 +29,7 @@ export type PreBundleContext = {
   getWebpackConfig: (name: string, outputPath: string, publicDir: string) => Promise<webpack.Configuration[]>;
 };
 
-export async function getShouldSkipBuild({
+async function getShouldSkipBuild({
   config,
   uiRoot,
   forceRebuild,
@@ -48,22 +45,6 @@ export async function getShouldSkipBuild({
   const isLocalBuildAvailable = existsSync(join(uiRoot.path, publicDir));
 
   return currentBundleUiHash === cachedBundleUiHash && !isLocalBuildAvailable && !forceRebuild;
-}
-
-export async function generateBundleUIEntry(
-  aspectDefs: AspectDefinition[],
-  rootExtensionName: string,
-  runtimeName: string,
-  rootAspect: string,
-  config: object,
-  dir: string,
-  ignoreVersion?: boolean
-) {
-  const contents = await createRoot(aspectDefs, rootExtensionName, rootAspect, runtimeName, config, ignoreVersion);
-  const filepath = resolve(join(dir, `${runtimeName}.root${sha1(contents)}.js`));
-  if (existsSync(filepath)) return filepath;
-  outputFileSync(filepath, contents);
-  return filepath;
 }
 
 // TODO: snigleton mode by name
@@ -85,7 +66,7 @@ export async function doBuild(context: PreBundleContext, customOutputPath?: stri
   return results;
 }
 
-export async function buildIfChanged(context: PreBundleContext): Promise<boolean> {
+async function buildIfChanged(context: PreBundleContext): Promise<boolean> {
   const { config, uiRoot, cache, logger, forceRebuild, shouldSkipBuild, publicDir } = context;
 
   logger.debug(`buildIfChanged, AspectId ${config.aspectId}`);
@@ -121,7 +102,7 @@ export async function buildIfChanged(context: PreBundleContext): Promise<boolean
   return true;
 }
 
-export async function buildIfNoBundle(context: PreBundleContext): Promise<boolean> {
+async function buildIfNoBundle(context: PreBundleContext): Promise<boolean> {
   const { config, uiRoot, cache, shouldSkipBuild, publicDir } = context;
   if (shouldSkipBuild) return false;
   const outputPath = resolve(uiRoot.path, publicDir);
@@ -132,7 +113,7 @@ export async function buildIfNoBundle(context: PreBundleContext): Promise<boolea
   return true;
 }
 
-export async function build(context: PreBundleContext): Promise<void> {
+export async function useBuild(context: PreBundleContext): Promise<void> {
   context.logger.debug(`buildUI, uiRootAspectId ${context.config.aspectId}`);
   context.shouldSkipBuild = await getShouldSkipBuild(context);
   await buildIfChanged(context);

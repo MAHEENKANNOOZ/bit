@@ -27,9 +27,10 @@ import { UIAspect, UIRuntime } from './ui.aspect';
 import createWebpackConfig from './webpack/webpack.browser.config';
 import createSsrWebpackConfig from './webpack/webpack.ssr.config';
 import { StartPlugin, StartPluginOptions } from './start-plugin';
+import { generateBundleUIEntry } from './bundle-ui';
 import { BUNDLE_UI_DIR, BUNDLE_UIROOT_DIR } from './bundle-ui.task';
+import { PreBundleContext, useBuild, doBuild } from './pre-bundle/build';
 import { createBundleHash, getBundlePath } from './pre-bundle/util';
-import { PreBundleContext, generateBundleUIEntry, build, doBuild } from './pre-bundle/build';
 
 export type UIDeps = [PubsubMain, CLIMain, GraphqlMain, ExpressMain, ComponentMain, CacheMain, LoggerMain, AspectMain];
 
@@ -330,7 +331,7 @@ export class UiMain {
         context.forceRebuild = rebuild;
         context.shouldSkipBuild = !!skipUiBuild;
         shouldSkipBuild = context.shouldSkipBuild;
-        await build(context);
+        await useBuild(context);
       }
       const bundleUiPath = getBundlePath(uiRootAspectId, BUNDLE_UI_DIR, BUNDLE_UIROOT_DIR[uiRootAspectId]);
       const bundleUiPublicPath = bundleUiPath ? join(bundleUiPath, publicDir) : undefined;

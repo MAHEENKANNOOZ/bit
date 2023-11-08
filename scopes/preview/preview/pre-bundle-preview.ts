@@ -1,7 +1,15 @@
 import { join, resolve } from 'path';
 import fs from 'fs-extra';
 import { AspectDefinition } from '@teambit/aspect-loader';
+import { CacheMain } from '@teambit/cache';
+import { Logger } from '@teambit/logger';
+import { UiMain } from '@teambit/ui';
 import { createImports, getIdSetters, getIdentifiers } from '@teambit/ui/dist/create-root';
+import { PreBundleContext, doBuild } from '@teambit/ui/pre-bundle/build';
+import webpack from 'webpack';
+import { PreviewAspect } from './preview.aspect';
+import createPreBundleConfig from './webpack/webpack.prebundle.config';
+import { PRE_BUNDLE_PREVIEW_DIR } from './pre-bundle-preview.task';
 
 const ENTRY_CONTENT_TEMPLATE = `__IMPORTS__
 
@@ -75,3 +83,46 @@ export const getEntryForPreBundlePreview = (
   }
   return entryPath;
 };
+
+export async function getPreviewBundleContext(
+  uiMain: UiMain,
+  cache: CacheMain,
+  logger: Logger
+): Promise<PreBundleContext> {
+  const ui = uiMain.getUi();
+  if (!ui) throw new Error('ui not found');
+  const [rootExtensionName, uiRoot] = ui;
+  const resolvedAspects = await uiRoot.resolveAspects('preview');
+  const context: PreBundleContext = {
+    config: {
+      runtime: 'preview',
+      aspectId: PreviewAspect.id,
+      bundleDir: PRE_BUNDLE_PREVIEW_DIR,
+      aspectDir: '',
+    },
+    uiRoot,
+    cache,
+    logger,
+    forceRebuild: false,
+    shouldSkipBuild: false,
+    publicDir: '',
+    init: undefined as any,
+    getWebpackConfig: async (name: string, outputPath: string) => {
+      const mainEntry = getEntryForPreBundlePreview(resolvedAspects, rootExtensionName, name, PreviewAspect.id);
+      const config = createPreBundleConfig(outputPath, mainEntry);
+      return [config];
+    },
+  };
+  return context;
+}
+
+export async function build(
+  uiMain: UiMain,
+  logger: Logger,
+  outputPath: string
+): Promise<webpack.MultiStats | undefined> {
+  logger.debug(`pre-bundle for preview: start`);
+  const context = await getPreviewBundleContext(uiMain, undefined as any, logger);
+  const results = await doBuild(context, outputPath);
+  return results;
+}
