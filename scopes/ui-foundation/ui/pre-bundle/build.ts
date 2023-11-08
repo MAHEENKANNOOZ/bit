@@ -1,13 +1,16 @@
 import webpack from 'webpack';
 import { join, resolve } from 'path';
-import { existsSync, pathExistsSync } from 'fs-extra';
+import { existsSync, outputFileSync, pathExistsSync } from 'fs-extra';
 import { promisify } from 'util';
 import chalk from 'chalk';
 import { CacheMain } from '@teambit/cache';
 import { Logger } from '@teambit/logger';
+import { AspectDefinition } from '@teambit/aspect-loader';
+import { sha1 } from '@teambit/legacy/dist/utils';
 
 import { UIRoot } from '../ui-root';
-import { clearConsole, createBundleHash, generateBundleEntry, readBundleHash } from './util';
+import { createRoot } from '../create-root';
+import { clearConsole, createBundleHash, readBundleHash } from './util';
 import { UnknownBuildError } from '../exceptions';
 
 export type PreBundleConfig = {
@@ -24,50 +27,51 @@ export type PreBundleContext = {
   logger: Logger;
   forceRebuild?: boolean;
   shouldSkipBuild: boolean;
-  getWebpackConfig: (name: string, entryPath: string, outputPath: string, publicDir: string) => webpack.Configuration[];
-  getHarmonyConfig: () => object;
-  getShouldAlwaysBuild: () => Promise<boolean>;
-  getLocalPublicDir: () => Promise<string>;
+  publicDir: string;
+  init: (context: PreBundleContext) => Promise<void>;
+  getWebpackConfig: (name: string, outputPath: string, publicDir: string) => Promise<webpack.Configuration[]>;
 };
 
 export async function getShouldSkipBuild({
   config,
   uiRoot,
   forceRebuild,
-  getLocalPublicDir,
-  getShouldAlwaysBuild,
+  publicDir,
+  shouldSkipBuild,
 }: PreBundleContext): Promise<boolean> {
-  if (!(await getShouldAlwaysBuild())) {
+  if (!shouldSkipBuild) {
     return false;
   }
 
   const currentBundleUiHash = await createBundleHash(uiRoot, config.runtime);
   const cachedBundleUiHash = readBundleHash(config.aspectId, config.bundleDir, config.aspectDir);
-  const isLocalBuildAvailable = existsSync(join(uiRoot.path, await getLocalPublicDir()));
+  const isLocalBuildAvailable = existsSync(join(uiRoot.path, publicDir));
 
   return currentBundleUiHash === cachedBundleUiHash && !isLocalBuildAvailable && !forceRebuild;
 }
 
+export async function generateBundleUIEntry(
+  aspectDefs: AspectDefinition[],
+  rootExtensionName: string,
+  runtimeName: string,
+  rootAspect: string,
+  config: object,
+  dir: string,
+  ignoreVersion?: boolean
+) {
+  const contents = await createRoot(aspectDefs, rootExtensionName, rootAspect, runtimeName, config, ignoreVersion);
+  const filepath = resolve(join(dir, `${runtimeName}.root${sha1(contents)}.js`));
+  if (existsSync(filepath)) return filepath;
+  outputFileSync(filepath, contents);
+  return filepath;
+}
+
 // TODO: snigleton mode by name
 export async function doBuild(context: PreBundleContext, customOutputPath?: string) {
-  const { uiRoot, config, getWebpackConfig, getHarmonyConfig, getLocalPublicDir } = context;
-  // TODO: decouple
-  const entryPath = await generateBundleEntry(
-    await uiRoot.resolveAspects(config.runtime),
-    config.aspectId,
-    config.runtime,
-    config.aspectId,
-    getHarmonyConfig(),
-    uiRoot.path
-  );
+  const { uiRoot, publicDir, getWebpackConfig } = context;
   const outputPath = customOutputPath || uiRoot.path;
 
-  const webpackConfig = getWebpackConfig(
-    uiRoot.name,
-    entryPath,
-    outputPath,
-    await getLocalPublicDir()
-  ) as webpack.Configuration[];
+  const webpackConfig = (await getWebpackConfig(uiRoot.name, outputPath, publicDir)) as webpack.Configuration[];
 
   const compiler = webpack(webpackConfig);
   const compilerRun = promisify(compiler.run.bind(compiler));
@@ -82,7 +86,7 @@ export async function doBuild(context: PreBundleContext, customOutputPath?: stri
 }
 
 export async function buildIfChanged(context: PreBundleContext): Promise<boolean> {
-  const { config, uiRoot, cache, logger, forceRebuild, getLocalPublicDir, shouldSkipBuild } = context;
+  const { config, uiRoot, cache, logger, forceRebuild, shouldSkipBuild, publicDir } = context;
 
   logger.debug(`buildIfChanged, AspectId ${config.aspectId}`);
 
@@ -101,14 +105,14 @@ export async function buildIfChanged(context: PreBundleContext): Promise<boolean
   if (!cachedBuildUiHash) {
     logger.console(
       `Building UI assets for '${chalk.cyan(uiRoot.name)}' in target directory: ${chalk.cyan(
-        await getLocalPublicDir()
+        publicDir
       )}. The first time we build the UI it may take a few minutes.`
     );
   } else {
     logger.console(
-      `Rebuilding UI assets for '${chalk.cyan(uiRoot.name)} in target directory: ${chalk.cyan(
-        await getLocalPublicDir()
-      )}' as ${uiRoot.configFile} has been changed.`
+      `Rebuilding UI assets for '${chalk.cyan(uiRoot.name)} in target directory: ${chalk.cyan(publicDir)}' as ${
+        uiRoot.configFile
+      } has been changed.`
     );
   }
 
@@ -118,9 +122,9 @@ export async function buildIfChanged(context: PreBundleContext): Promise<boolean
 }
 
 export async function buildIfNoBundle(context: PreBundleContext): Promise<boolean> {
-  const { config, uiRoot, cache, shouldSkipBuild, getLocalPublicDir } = context;
+  const { config, uiRoot, cache, shouldSkipBuild, publicDir } = context;
   if (shouldSkipBuild) return false;
-  const outputPath = resolve(uiRoot.path, await getLocalPublicDir());
+  const outputPath = resolve(uiRoot.path, publicDir);
   if (pathExistsSync(outputPath)) return false;
   const hash = await createBundleHash(uiRoot, config.runtime);
   await doBuild(context);

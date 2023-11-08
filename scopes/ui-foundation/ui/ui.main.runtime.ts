@@ -28,8 +28,8 @@ import createWebpackConfig from './webpack/webpack.browser.config';
 import createSsrWebpackConfig from './webpack/webpack.ssr.config';
 import { StartPlugin, StartPluginOptions } from './start-plugin';
 import { BUNDLE_UI_DIR, BUNDLE_UIROOT_DIR } from './bundle-ui.task';
-import { createBundleHash, generateBundleEntry, getBundlePath } from './pre-bundle/util';
-import { PreBundleContext, build, doBuild } from './pre-bundle/build';
+import { createBundleHash, getBundlePath } from './pre-bundle/util';
+import { PreBundleContext, generateBundleUIEntry, build, doBuild } from './pre-bundle/build';
 
 export type UIDeps = [PubsubMain, CLIMain, GraphqlMain, ExpressMain, ComponentMain, CacheMain, LoggerMain, AspectMain];
 
@@ -211,7 +211,7 @@ export class UiMain {
    * create a build of the given UI root.
    */
   async build(uiRootAspectIdOrName?: string, customOutputPath?: string): Promise<webpack.MultiStats | undefined> {
-    const context = this.getBundleContext(uiRootAspectIdOrName);
+    const context = await this.getBundleContext(uiRootAspectIdOrName);
     context.forceRebuild = true;
     return doBuild(context, customOutputPath);
   }
@@ -227,7 +227,7 @@ export class UiMain {
     return plugins;
   }
 
-  private getBundleContext(uiRootAspectIdOrName?: string): PreBundleContext {
+  private async getBundleContext(uiRootAspectIdOrName?: string): Promise<PreBundleContext> {
     this.logger.debug(`build, uiRootAspectIdOrName: "${uiRootAspectIdOrName}"`);
     const maybeUiRoot = this.getUi(uiRootAspectIdOrName);
 
@@ -236,7 +236,7 @@ export class UiMain {
 
     const ssr = uiRoot.buildOptions?.ssr || false;
 
-    return {
+    const context: PreBundleContext = {
       config: {
         aspectId: uiRootAspectId,
         runtime: 'ui',
@@ -248,19 +248,32 @@ export class UiMain {
       uiRoot,
       forceRebuild: false,
       shouldSkipBuild: false,
-      getWebpackConfig: (name: string, entryPath: string, outputPath: string, localPublicDir: string) => {
+      publicDir: '',
+      init: async (self: PreBundleContext) => {
+        self.shouldSkipBuild = !!uiRoot.buildOptions?.prebundle;
+        self.publicDir = await this.publicDir(uiRoot);
+      },
+      getWebpackConfig: async (name: string, outputPath: string, localPublicDir: string) => {
+        const entryPath = await generateBundleUIEntry(
+          await uiRoot.resolveAspects('ui'),
+          uiRootAspectId,
+          'ui',
+          uiRootAspectId,
+          this.harmony.config.toObject(),
+          uiRoot.path
+        );
+
         const browserConfig = createWebpackConfig(outputPath, [entryPath], name, localPublicDir);
         const ssrConfig = ssr && createSsrWebpackConfig(outputPath, [entryPath], localPublicDir);
 
         const config = [browserConfig, ssrConfig].filter((x) => !!x) as webpack.Configuration[];
         return config;
       },
-      getHarmonyConfig: () => this.harmony.config.toObject(),
-      getShouldAlwaysBuild: async () => {
-        return !uiRoot.buildOptions?.prebundle;
-      },
-      getLocalPublicDir: () => this.publicDir(uiRoot),
     };
+
+    await context.init(context);
+
+    return context;
   }
 
   /**
@@ -313,7 +326,7 @@ export class UiMain {
       if (overwrite) {
         await overwrite(uiRootAspectId, uiRoot, rebuild);
       } else {
-        const context = this.getBundleContext(uiRootAspectId);
+        const context = await this.getBundleContext(uiRootAspectId);
         context.forceRebuild = rebuild;
         context.shouldSkipBuild = !!skipUiBuild;
         shouldSkipBuild = context.shouldSkipBuild;
@@ -468,7 +481,7 @@ export class UiMain {
     path?: string,
     ignoreVersion?: boolean
   ) {
-    return generateBundleEntry(
+    return generateBundleUIEntry(
       aspectDefs,
       rootExtensionName,
       runtimeName,

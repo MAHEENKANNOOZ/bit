@@ -1,11 +1,10 @@
-import { join, resolve } from 'path';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, outputFileSync } from 'fs-extra';
+import { join } from 'path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs-extra';
 import { UIRoot } from '@teambit/ui';
-import { AspectDefinition, getAspectDirFromBvm } from '@teambit/aspect-loader';
+import { getAspectDirFromBvm } from '@teambit/aspect-loader';
 import { SlotRegistry } from '@teambit/harmony';
 import { ArtifactDefinition } from '@teambit/builder';
 import { sha1 } from '@teambit/legacy/dist/utils';
-import { createRoot } from '../create-root';
 
 export type UIRootRegistry = SlotRegistry<UIRoot>;
 
@@ -38,24 +37,6 @@ export async function generateBundleHash(uiRoot: UIRoot, runtime: string, output
   const hash = await createBundleHash(uiRoot, runtime);
   if (!existsSync(outputPath)) mkdirSync(outputPath);
   writeFileSync(join(outputPath, BUNDLE_HASH_FILENAME), hash);
-}
-
-// bundle entry
-
-export async function generateBundleEntry(
-  aspectDefs: AspectDefinition[],
-  rootExtensionName: string,
-  runtimeName: string,
-  rootAspect: string,
-  config: object,
-  dir: string,
-  ignoreVersion?: boolean
-) {
-  const contents = await createRoot(aspectDefs, rootExtensionName, rootAspect, runtimeName, config, ignoreVersion);
-  const filepath = resolve(join(dir, `${runtimeName}.root${sha1(contents)}.js`));
-  if (existsSync(filepath)) return filepath;
-  outputFileSync(filepath, contents);
-  return filepath;
 }
 
 // bundle artifact
