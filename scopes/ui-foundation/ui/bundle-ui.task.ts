@@ -1,9 +1,9 @@
 import { join } from 'path';
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { BuildContext, BuildTask, BuiltTaskResult, TaskLocation } from '@teambit/builder';
 import { Capsule } from '@teambit/isolator';
 import { Logger } from '@teambit/logger';
 import { UIAspect, UiMain } from '@teambit/ui';
+import { generateBundleHash, getBundleArtifactDef, getBundleArtifactDirectory } from './pre-bundle/util';
 
 export const BUNDLE_UI_TASK_NAME = 'BundleUI';
 export const BUNDLE_UI_DIR = 'ui-bundle';
@@ -32,53 +32,33 @@ export class BundleUiTask implements BuildTask {
       return { componentsResults: [] };
     }
 
+    const maybeUiRoot = this.ui.getUi();
+    if (!maybeUiRoot) throw new Error('no uiRoot found');
+    const [, uiRoot] = maybeUiRoot;
+
     try {
       await Promise.all(
         Object.values(UIROOT_ASPECT_IDS).map(async (uiRootAspectId) => {
-          const outputPath = join(capsule.path, BundleUiTask.getArtifactDirectory(uiRootAspectId));
+          const outputPath = join(
+            capsule.path,
+            getBundleArtifactDirectory(BUNDLE_UI_DIR, BUNDLE_UIROOT_DIR[uiRootAspectId])
+          );
           this.logger.info(`Generating UI bundle at ${outputPath}...`);
           await this.ui.build(uiRootAspectId, outputPath);
-          await this.generateHash(outputPath);
+          await generateBundleHash(uiRoot, 'ui', outputPath);
         })
       );
     } catch (error) {
       this.logger.error('Generating UI bundle failed');
       throw new Error('Generating UI bundle failed');
     }
-    const artifacts = BundleUiTask.getArtifactDef();
+
     return {
       componentsResults: [],
-      artifacts,
+      artifacts: [
+        getBundleArtifactDef(BUNDLE_UI_DIR, BUNDLE_UIROOT_DIR[UIROOT_ASPECT_IDS.SCOPE]),
+        getBundleArtifactDef(BUNDLE_UI_DIR, BUNDLE_UIROOT_DIR[UIROOT_ASPECT_IDS.WORKSPACE]),
+      ],
     };
-  }
-
-  private async generateHash(outputPath: string): Promise<void> {
-    const maybeUiRoot = this.ui.getUi();
-    if (!maybeUiRoot) throw new Error('no uiRoot found');
-
-    const [, uiRoot] = maybeUiRoot;
-    const hash = await this.ui.createBundleUiHash(uiRoot);
-
-    if (!existsSync(outputPath)) mkdirSync(outputPath);
-    writeFileSync(join(outputPath, BUNDLE_UI_HASH_FILENAME), hash);
-  }
-
-  static getArtifactDirectory(uiRootAspectId) {
-    return join('artifacts', BUNDLE_UI_DIR, BUNDLE_UIROOT_DIR[uiRootAspectId]);
-  }
-
-  static getArtifactDef() {
-    const scopeRootDir = BundleUiTask.getArtifactDirectory(UIROOT_ASPECT_IDS.SCOPE);
-    const workspaceRootDir = BundleUiTask.getArtifactDirectory(UIROOT_ASPECT_IDS.WORKSPACE);
-    return [
-      {
-        name: `${BUNDLE_UI_DIR}-${BUNDLE_UIROOT_DIR[UIROOT_ASPECT_IDS.SCOPE]}`,
-        globPatterns: [`${scopeRootDir}/**`],
-      },
-      {
-        name: `${BUNDLE_UI_DIR}-${BUNDLE_UIROOT_DIR[UIROOT_ASPECT_IDS.WORKSPACE]}`,
-        globPatterns: [`${workspaceRootDir}/**`],
-      },
-    ];
   }
 }

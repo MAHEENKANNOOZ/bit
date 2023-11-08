@@ -29,6 +29,7 @@ import { LoggerAspect, LoggerMain, Logger } from '@teambit/logger';
 import { DependencyResolverAspect } from '@teambit/dependency-resolver';
 import type { DependencyResolverMain } from '@teambit/dependency-resolver';
 import { createImports, getIdSetters, getIdentifiers } from '@teambit/ui/dist/create-root';
+import { getBundleArtifactDirectory } from '@teambit/ui/pre-bundle/util';
 import { sha1 } from '@teambit/legacy/dist/utils';
 import { ArtifactFiles } from '@teambit/legacy/dist/consumer/component/sources/artifact-files';
 import WatcherAspect, { WatcherMain } from '@teambit/watcher';
@@ -40,7 +41,7 @@ import { PreviewDefinition } from './preview-definition';
 import { PreviewAspect, PreviewRuntime } from './preview.aspect';
 import { PreviewRoute } from './preview.route';
 import { PreviewTask, PREVIEW_TASK_NAME } from './preview.task';
-import { PreBundlePreviewTask } from './pre-bundle-preview.task';
+import { PRE_BUNDLE_PREVIEW_DIR } from './pre-bundle-preview.task';
 import { BundlingStrategy } from './bundling-strategy';
 import {
   EnvBundlingStrategy,
@@ -622,7 +623,7 @@ export class PreviewMain {
 
   private writePreviewEntry(customAspects: AspectDefinition[] = []) {
     const previewPathFromBvm = getAspectDirFromBvm(PreviewAspect.id);
-    const previewArtifactPath = PreBundlePreviewTask.getArtifactDirectory();
+    const previewArtifactPath = getBundleArtifactDirectory(PRE_BUNDLE_PREVIEW_DIR, '');
     const previewPreBundlePath = join(previewPathFromBvm, previewArtifactPath);
     const manifestPath = join(previewPreBundlePath, 'asset-manifest.json');
     const manifest = readJsonSync(manifestPath);

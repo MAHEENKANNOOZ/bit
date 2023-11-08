@@ -1,13 +1,12 @@
 import { join } from 'path';
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { BuildContext, BuildTask, BuiltTaskResult, TaskLocation } from '@teambit/builder';
 import { Capsule } from '@teambit/isolator';
 import { Logger } from '@teambit/logger';
-import { UIRoot, UiMain } from '@teambit/ui';
+import { UiMain } from '@teambit/ui';
+import { generateBundleHash, getBundleArtifactDef, getBundleArtifactDirectory } from '@teambit/ui/pre-bundle/util';
 import { PreviewAspect } from '@teambit/preview';
 import { promisify } from 'util';
 import webpack from 'webpack';
-import { sha1 } from '@teambit/legacy/dist/utils';
 import createPreBundleConfig from './webpack/webpack.prebundle.config';
 import { getEntryForPreBundlePreview } from './pre-bundle-preview';
 
@@ -32,22 +31,11 @@ async function build(uiMain: UiMain, logger: Logger, outputPath: string): Promis
   logger.debug(`pre-bundle for preview: completed webpack`);
   if (!results) throw new Error('unknown error during pre-bundle for preview');
   if (results?.hasErrors()) {
-    clearConsole();
     throw new Error(results?.toString());
   }
 
   return results;
-}
-
-async function createBundleUiHash(uiRoot: UIRoot): Promise<string> {
-  const aspects = await uiRoot.resolveAspects('preview');
-  aspects.sort((a, b) => ((a.getId || a.aspectPath) > (b.getId || b.aspectPath) ? 1 : -1));
-  const aspectIds = aspects.map((aspect) => aspect.getId || aspect.aspectPath);
-  return sha1(aspectIds.join(''));
-}
-
-function clearConsole() {
-  process.stdout.write(process.platform === 'win32' ? '\x1B[2J\x1B[0f' : '\x1B[2J\x1B[3J\x1B[H');
+  // return doBuild(getBundleContext(outputPath))
 }
 
 export class PreBundlePreviewTask implements BuildTask {
@@ -65,44 +53,24 @@ export class PreBundlePreviewTask implements BuildTask {
       return { componentsResults: [] };
     }
 
-    try {
-      const outputPath = join(capsule.path, PreBundlePreviewTask.getArtifactDirectory());
-      this.logger.info(`Generating Preview pre-bundle at ${outputPath}...`);
-      await build(this.ui, this.logger, outputPath);
-      await this.generateHash(outputPath);
-    } catch (error) {
-      this.logger.error('Generating Preview pre-bundle failed');
-      throw new Error('Generating Preview pre-bundle failed');
-    }
-    const artifacts = PreBundlePreviewTask.getArtifactDef();
-    return {
-      componentsResults: [],
-      artifacts,
-    };
-  }
-
-  private async generateHash(outputPath: string): Promise<void> {
     const maybeUiRoot = this.ui.getUi();
     if (!maybeUiRoot) throw new Error('no uiRoot found');
 
     const [, uiRoot] = maybeUiRoot;
-    const hash = await createBundleUiHash(uiRoot);
 
-    if (!existsSync(outputPath)) mkdirSync(outputPath);
-    writeFileSync(join(outputPath, PRE_BUNDLE_PREVIEW_HASH_FILENAME), hash);
-  }
+    try {
+      const outputPath = join(capsule.path, getBundleArtifactDirectory(PRE_BUNDLE_PREVIEW_DIR, ''));
+      this.logger.info(`Generating Preview pre-bundle at ${outputPath}...`);
+      await build(this.ui, this.logger, outputPath);
+      await generateBundleHash(uiRoot, 'preview', outputPath);
+    } catch (error) {
+      this.logger.error('Generating Preview pre-bundle failed');
+      throw new Error('Generating Preview pre-bundle failed');
+    }
 
-  static getArtifactDirectory() {
-    return join('artifacts', PRE_BUNDLE_PREVIEW_DIR);
-  }
-
-  static getArtifactDef() {
-    const workspaceRootDir = PreBundlePreviewTask.getArtifactDirectory();
-    return [
-      {
-        name: `${PRE_BUNDLE_PREVIEW_DIR}`,
-        globPatterns: [`${workspaceRootDir}/**`],
-      },
-    ];
+    return {
+      componentsResults: [],
+      artifacts: [getBundleArtifactDef(PRE_BUNDLE_PREVIEW_DIR, '')],
+    };
   }
 }

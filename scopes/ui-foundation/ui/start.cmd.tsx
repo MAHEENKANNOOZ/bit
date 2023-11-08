@@ -6,6 +6,7 @@ import { UIServerConsole } from '@teambit/ui-foundation.cli.ui-server-console';
 import React from 'react';
 import openBrowser from 'react-dev-utils/openBrowser';
 import type { UiMain } from './ui.main.runtime';
+import { clearConsole } from './bundle/util';
 
 type StartArgs = [userPattern: string];
 type StartFlags = {
@@ -120,7 +121,7 @@ export class StartCmd implements Command {
     // DO NOT CHANGE THIS - this meant to be an async hook.
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     this.ui.invokeOnStart();
-    this.ui.clearConsole();
+    clearConsole();
 
     return <UIServerConsole appName={appName} futureUiServer={uiServer} url={this.ui.publicUrl} />;
   }
