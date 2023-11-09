@@ -363,20 +363,15 @@ export class UiMain {
 
   // MAIN FLOW: create runtime
 
+  runtimeOptions: RuntimeOptions = {};
+
   /**
    * create a Bit UI runtime.
    */
-  async createRuntime({
-    uiRootName,
-    uiRootAspectIdOrName,
-    pattern,
-    dev,
-    port,
-    rebuild,
-    verbose,
-    skipUiBuild,
-  }: RuntimeOptions) {
+  async createRuntime(runtimeOptions: RuntimeOptions) {
     // uiRootName to be deprecated
+    this.runtimeOptions = runtimeOptions;
+    const { uiRootName, uiRootAspectIdOrName, pattern, dev, port, rebuild, verbose, skipUiBuild } = this.runtimeOptions;
     const { uiRootAspectId, uiRoot, cache, logger, harmonyConfig } = this.getUiRootContext(
       uiRootName || uiRootAspectIdOrName
     );

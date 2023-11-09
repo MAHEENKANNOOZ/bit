@@ -47,6 +47,7 @@ export class PreBundlePreviewTask implements BuildTask {
       await generateBundleHash(uiRoot, PRE_BUNDLE_PREVIEW_RUNTIME_NAME, outputPath);
     } catch (error) {
       this.logger.error('Generating Preview pre-bundle failed');
+      console.error(error);
       throw new Error('Generating Preview pre-bundle failed');
     }
 

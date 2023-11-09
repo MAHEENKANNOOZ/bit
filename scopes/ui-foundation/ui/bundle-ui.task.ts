@@ -57,6 +57,7 @@ export class BundleUiTask implements BuildTask {
       );
     } catch (error) {
       this.logger.error('Generating UI bundle failed');
+      console.error(error);
       throw new Error('Generating UI bundle failed');
     }
 

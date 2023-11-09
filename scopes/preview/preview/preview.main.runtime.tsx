@@ -618,7 +618,13 @@ export class PreviewMain {
   private async writePreviewEntry() {
     const { uiRoot, uiRootAspectId, logger, cache, harmonyConfig } = this.ui.getUiRootContext();
     const context = await getPreBundlePreviewContext(uiRootAspectId, uiRoot, cache, logger);
-    // TODO: set rebuild flag necessarily
+    const { rebuild, skipUiBuild } = this.ui.runtimeOptions;
+    if (rebuild) {
+      context.forceRebuild = true;
+    }
+    if (skipUiBuild) {
+      context.forceSkipBuild = true;
+    }
     await useBuild(context);
     const preBundlePreviewPath = getBundlePath(PRE_BUNDLE_PREVIEW_ID, PRE_BUNDLE_PREVIEW_DIR, '');
     const previewPreBundlePath = preBundlePreviewPath
