@@ -1,21 +1,14 @@
+/**
+ * @fileoverview
+ */
+
 import { join } from 'path';
 import { BuildContext, BuildTask, BuiltTaskResult, TaskLocation } from '@teambit/builder';
 import { Capsule } from '@teambit/isolator';
 import { Logger } from '@teambit/logger';
 import { UIAspect, UiMain } from '@teambit/ui';
 import { generateBundleHash, getBundleArtifactDef, getBundleArtifactDirectory } from './pre-bundle/util';
-
-export const BUNDLE_UI_TASK_NAME = 'BundleUI';
-export const BUNDLE_UI_DIR = 'ui-bundle';
-export const UIROOT_ASPECT_IDS = {
-  SCOPE: 'teambit.scope/scope',
-  WORKSPACE: 'teambit.workspace/workspace',
-};
-export const BUNDLE_UIROOT_DIR = {
-  [UIROOT_ASPECT_IDS.SCOPE]: 'scope',
-  [UIROOT_ASPECT_IDS.WORKSPACE]: 'workspace',
-};
-export const BUNDLE_UI_HASH_FILENAME = '.hash';
+import { BUNDLE_UIROOT_DIR, BUNDLE_UI_DIR, BUNDLE_UI_TASK_NAME, UIROOT_ASPECT_IDS, buildBundleUI } from './bundle-ui';
 
 export class BundleUiTask implements BuildTask {
   aspectId = 'teambit.ui-foundation/ui';
@@ -44,7 +37,7 @@ export class BundleUiTask implements BuildTask {
             getBundleArtifactDirectory(BUNDLE_UI_DIR, BUNDLE_UIROOT_DIR[uiRootAspectId])
           );
           this.logger.info(`Generating UI bundle at ${outputPath}...`);
-          await this.ui.build(uiRootAspectId, outputPath);
+          await buildBundleUI(this.ui, uiRootAspectId, outputPath);
           await generateBundleHash(uiRoot, 'ui', outputPath);
         })
       );

@@ -1,3 +1,7 @@
+/**
+ * @fileoverview
+ */
+
 import { join } from 'path';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs-extra';
 import { UIRoot } from '@teambit/ui';
@@ -63,43 +67,6 @@ export function getBundlePath(aspectId: string, bundleDir: string, aspectDir: st
     return undefined;
   }
 }
-
-// // get ui
-
-// export function getUiByName(
-//   uiRootSlot: UIRootRegistry,
-//   name: string
-// ) {
-//   const roots = uiRootSlot.toArray();
-//   const [, root] =
-//     roots.find(([, uiRoot]) => {
-//       return uiRoot.name === name;
-//     }) || [];
-//   return root;
-// }
-
-// export function getUi(
-//   uiRootSlot: UIRootRegistry,
-//   uiRootAspectIdOrName?: string
-// ): [string, UIRoot] | undefined {
-//   if (uiRootAspectIdOrName) {
-//     const root = uiRootSlot.get(uiRootAspectIdOrName) || getUiByName(uiRootSlot, uiRootAspectIdOrName);
-//     if (!root) return undefined;
-//     return [uiRootAspectIdOrName, root];
-//   }
-//   const uis = uiRootSlot.toArray();
-//   if (uis.length === 1) return uis[0];
-//   return uis.find(([, root]) => root.priority);
-// }
-
-// export function getUiName(
-//   uiRootSlot: UIRootRegistry,
-//   uiRootAspectIdOrName?: string
-// ): string | undefined {
-//   const [, ui] = getUi(uiRootSlot, uiRootAspectIdOrName) || [];
-//   if (!ui) return undefined;
-//   return ui.name;
-// }
 
 // others
 

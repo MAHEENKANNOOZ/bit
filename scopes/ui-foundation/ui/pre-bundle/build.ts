@@ -1,3 +1,7 @@
+/**
+ * @fileoverview
+ */
+
 import webpack from 'webpack';
 import { join, resolve } from 'path';
 import { existsSync, pathExistsSync } from 'fs-extra';
@@ -15,6 +19,7 @@ export type PreBundleConfig = {
   aspectId: string;
   bundleDir: string;
   aspectDir: string;
+  publicDir: string;
 };
 
 export type PreBundleContext = {
@@ -23,9 +28,8 @@ export type PreBundleContext = {
   cache: CacheMain;
   logger: Logger;
   forceRebuild?: boolean;
-  shouldSkipBuild: boolean;
-  publicDir: string;
-  init: (context: PreBundleContext) => Promise<void>;
+  forceSkipBuild?: boolean;
+  shouldSkipBuild?: boolean;
   getWebpackConfig: (name: string, outputPath: string, publicDir: string) => Promise<webpack.Configuration[]>;
 };
 
@@ -33,26 +37,26 @@ async function getShouldSkipBuild({
   config,
   uiRoot,
   forceRebuild,
-  publicDir,
-  shouldSkipBuild,
+  forceSkipBuild,
 }: PreBundleContext): Promise<boolean> {
-  if (!shouldSkipBuild) {
+  if (forceSkipBuild) {
+    return true;
+  }
+  if (forceRebuild) {
     return false;
   }
-
   const currentBundleUiHash = await createBundleHash(uiRoot, config.runtime);
   const cachedBundleUiHash = readBundleHash(config.aspectId, config.bundleDir, config.aspectDir);
-  const isLocalBuildAvailable = existsSync(join(uiRoot.path, publicDir));
-
-  return currentBundleUiHash === cachedBundleUiHash && !isLocalBuildAvailable && !forceRebuild;
+  const isLocalBuildAvailable = existsSync(join(uiRoot.path, config.publicDir));
+  return currentBundleUiHash === cachedBundleUiHash && !isLocalBuildAvailable;
 }
 
-// TODO: snigleton mode by name
+// TODO: singleton mode by name
 export async function doBuild(context: PreBundleContext, customOutputPath?: string) {
-  const { uiRoot, publicDir, getWebpackConfig } = context;
+  const { uiRoot, config, getWebpackConfig } = context;
   const outputPath = customOutputPath || uiRoot.path;
 
-  const webpackConfig = (await getWebpackConfig(uiRoot.name, outputPath, publicDir)) as webpack.Configuration[];
+  const webpackConfig = (await getWebpackConfig(uiRoot.name, outputPath, config.publicDir)) as webpack.Configuration[];
 
   const compiler = webpack(webpackConfig);
   const compilerRun = promisify(compiler.run.bind(compiler));
@@ -67,7 +71,7 @@ export async function doBuild(context: PreBundleContext, customOutputPath?: stri
 }
 
 async function buildIfChanged(context: PreBundleContext): Promise<boolean> {
-  const { config, uiRoot, cache, logger, forceRebuild, shouldSkipBuild, publicDir } = context;
+  const { config, uiRoot, cache, logger, shouldSkipBuild } = context;
 
   logger.debug(`buildIfChanged, AspectId ${config.aspectId}`);
 
@@ -78,7 +82,7 @@ async function buildIfChanged(context: PreBundleContext): Promise<boolean> {
 
   const currentBuildUiHash = await createBundleHash(uiRoot, config.runtime);
   const cachedBuildUiHash = await cache.get(uiRoot.path);
-  if (currentBuildUiHash === cachedBuildUiHash && !forceRebuild) {
+  if (currentBuildUiHash === cachedBuildUiHash) {
     logger.debug(`buildIfChanged, AspectId ${config.aspectId}, returned from ui build cache`);
     return false;
   }
@@ -86,12 +90,12 @@ async function buildIfChanged(context: PreBundleContext): Promise<boolean> {
   if (!cachedBuildUiHash) {
     logger.console(
       `Building UI assets for '${chalk.cyan(uiRoot.name)}' in target directory: ${chalk.cyan(
-        publicDir
+        config.publicDir
       )}. The first time we build the UI it may take a few minutes.`
     );
   } else {
     logger.console(
-      `Rebuilding UI assets for '${chalk.cyan(uiRoot.name)} in target directory: ${chalk.cyan(publicDir)}' as ${
+      `Rebuilding UI assets for '${chalk.cyan(uiRoot.name)} in target directory: ${chalk.cyan(config.publicDir)}' as ${
         uiRoot.configFile
       } has been changed.`
     );
@@ -103,9 +107,9 @@ async function buildIfChanged(context: PreBundleContext): Promise<boolean> {
 }
 
 async function buildIfNoBundle(context: PreBundleContext): Promise<boolean> {
-  const { config, uiRoot, cache, shouldSkipBuild, publicDir } = context;
+  const { config, uiRoot, cache, shouldSkipBuild } = context;
   if (shouldSkipBuild) return false;
-  const outputPath = resolve(uiRoot.path, publicDir);
+  const outputPath = resolve(uiRoot.path, config.publicDir);
   if (pathExistsSync(outputPath)) return false;
   const hash = await createBundleHash(uiRoot, config.runtime);
   await doBuild(context);

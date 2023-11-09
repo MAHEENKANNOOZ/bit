@@ -1,3 +1,7 @@
+/**
+ * @fileoverview
+ */
+
 import { join } from 'path';
 import { BuildContext, BuildTask, BuiltTaskResult, TaskLocation } from '@teambit/builder';
 import { Capsule } from '@teambit/isolator';
@@ -5,11 +9,7 @@ import { Logger } from '@teambit/logger';
 import { UiMain } from '@teambit/ui';
 import { generateBundleHash, getBundleArtifactDef, getBundleArtifactDirectory } from '@teambit/ui/pre-bundle/util';
 import { PreviewAspect } from '@teambit/preview';
-import { build } from './pre-bundle-preview';
-
-export const PRE_BUNDLE_PREVIEW_TASK_NAME = 'PreBundlePreview';
-export const PRE_BUNDLE_PREVIEW_DIR = 'preview-pre-bundle';
-export const PRE_BUNDLE_PREVIEW_HASH_FILENAME = '.hash';
+import { PRE_BUNDLE_PREVIEW_DIR, PRE_BUNDLE_PREVIEW_TASK_NAME, buildPreBundlePreview } from './pre-bundle-preview';
 
 export class PreBundlePreviewTask implements BuildTask {
   aspectId = 'teambit.preview/preview';
@@ -34,7 +34,7 @@ export class PreBundlePreviewTask implements BuildTask {
     try {
       const outputPath = join(capsule.path, getBundleArtifactDirectory(PRE_BUNDLE_PREVIEW_DIR, ''));
       this.logger.info(`Generating Preview pre-bundle at ${outputPath}...`);
-      await build(this.ui, this.logger, outputPath);
+      await buildPreBundlePreview(this.ui, this.logger, outputPath);
       await generateBundleHash(uiRoot, 'preview', outputPath);
     } catch (error) {
       this.logger.error('Generating Preview pre-bundle failed');

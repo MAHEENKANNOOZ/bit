@@ -41,7 +41,7 @@ import { PreviewDefinition } from './preview-definition';
 import { PreviewAspect, PreviewRuntime } from './preview.aspect';
 import { PreviewRoute } from './preview.route';
 import { PreviewTask, PREVIEW_TASK_NAME } from './preview.task';
-import { PRE_BUNDLE_PREVIEW_DIR } from './pre-bundle-preview.task';
+import { PRE_BUNDLE_PREVIEW_DIR } from './pre-bundle-preview';
 import { BundlingStrategy } from './bundling-strategy';
 import {
   EnvBundlingStrategy,
@@ -623,10 +623,23 @@ export class PreviewMain {
 
   private writePreviewEntry(customAspects: AspectDefinition[] = []) {
     // TODO: check the availablility and validity of the preview pre-bundle
+
     // - get preview bundle context
+    // const { uiRoot, uiRootAspectId, cache } = uiMain.getUiRootContext();
+    // getPreBundlePreviewContext(uiRootAspectId, uiRoot, '', cache, logger)
+
     // - set rebuild flag necessarily
+    // ?
+
     // - build
+    // await useBuild(context);
+
     // - get the preview bundle path
+    // const bundleUiPath = getBundlePath(uiRootAspectId, BUNDLE_UI_DIR, BUNDLE_UIROOT_DIR[uiRootAspectId]);
+    // const bundleUiPublicPath = bundleUiPath ? join(bundleUiPath, publicDir) : undefined;
+    // const bundleUiRoot =
+    //   shouldSkipBuild && bundleUiPublicPath && existsSync(bundleUiPublicPath || '') ? bundleUiPublicPath : undefined;
+
     const previewPathFromBvm = getAspectDirFromBvm(PreviewAspect.id);
     const previewArtifactPath = getBundleArtifactDirectory(PRE_BUNDLE_PREVIEW_DIR, '');
     // TODO: to be customizable to like `<workspace-root>/public/preview`

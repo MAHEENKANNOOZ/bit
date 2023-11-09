@@ -1,15 +1,23 @@
+/**
+ * @fileoverview
+ */
+
+// TODO: debug: publicDir, dir, runtimeName, aspectId, rootAspect, rootExtensionName
+
 import { join, resolve } from 'path';
 import fs from 'fs-extra';
 import { AspectDefinition } from '@teambit/aspect-loader';
 import { CacheMain } from '@teambit/cache';
 import { Logger } from '@teambit/logger';
-import { UiMain } from '@teambit/ui';
+import { UIRoot, UiMain } from '@teambit/ui';
 import { createImports, getIdSetters, getIdentifiers } from '@teambit/ui/dist/create-root';
 import { PreBundleContext, doBuild } from '@teambit/ui/pre-bundle/build';
 import webpack from 'webpack';
 import { PreviewAspect } from './preview.aspect';
 import createPreBundleConfig from './webpack/webpack.prebundle.config';
-import { PRE_BUNDLE_PREVIEW_DIR } from './pre-bundle-preview.task';
+
+export const PRE_BUNDLE_PREVIEW_TASK_NAME = 'PreBundlePreview';
+export const PRE_BUNDLE_PREVIEW_DIR = 'preview-pre-bundle';
 
 const ENTRY_CONTENT_TEMPLATE = `__IMPORTS__
 
@@ -62,13 +70,14 @@ export const run = (config, customAspects = []) => {
 };
 `;
 
-export const getEntryForPreBundlePreview = (
+export const generatePreBundlePreviewEntry = (
   aspectDefs: AspectDefinition[],
   rootExtensionName: string,
   runtime: string,
-  rootAspect: string
+  rootAspect: string,
+  dir: string
 ) => {
-  const entryPath = resolve(join(__dirname, `pre-bundle-preview-entry.js`));
+  const entryPath = resolve(join(dir, `pre-bundle-preview-entry.js`));
   const imports = createImports(aspectDefs);
   const identifiers = getIdentifiers(aspectDefs, 'Aspect');
   const idSetters = getIdSetters(aspectDefs, 'Aspect');
@@ -84,31 +93,33 @@ export const getEntryForPreBundlePreview = (
   return entryPath;
 };
 
-export async function getPreviewBundleContext(
-  uiMain: UiMain,
+export async function getPreBundlePreviewContext(
+  uiRootAspectId: string,
+  uiRoot: UIRoot,
+  publicDir,
   cache: CacheMain,
   logger: Logger
 ): Promise<PreBundleContext> {
-  const ui = uiMain.getUi();
-  if (!ui) throw new Error('ui not found');
-  const [rootExtensionName, uiRoot] = ui;
-  const resolvedAspects = await uiRoot.resolveAspects('preview');
   const context: PreBundleContext = {
     config: {
       runtime: 'preview',
       aspectId: PreviewAspect.id,
       bundleDir: PRE_BUNDLE_PREVIEW_DIR,
       aspectDir: '',
+      publicDir,
     },
     uiRoot,
     cache,
     logger,
-    forceRebuild: false,
-    shouldSkipBuild: false,
-    publicDir: '',
-    init: undefined as any,
     getWebpackConfig: async (name: string, outputPath: string) => {
-      const mainEntry = getEntryForPreBundlePreview(resolvedAspects, rootExtensionName, name, PreviewAspect.id);
+      const resolvedAspects = await uiRoot.resolveAspects('preview');
+      const mainEntry = generatePreBundlePreviewEntry(
+        resolvedAspects,
+        uiRootAspectId,
+        name,
+        PreviewAspect.id,
+        __dirname
+      );
       const config = createPreBundleConfig(outputPath, mainEntry);
       return [config];
     },
@@ -116,13 +127,15 @@ export async function getPreviewBundleContext(
   return context;
 }
 
-export async function build(
+export async function buildPreBundlePreview(
   uiMain: UiMain,
   logger: Logger,
   outputPath: string
 ): Promise<webpack.MultiStats | undefined> {
   logger.debug(`pre-bundle for preview: start`);
-  const context = await getPreviewBundleContext(uiMain, undefined as any, logger);
+  const { uiRoot, uiRootAspectId, cache } = uiMain.getUiRootContext();
+  // TODO: double-check
+  const context = await getPreBundlePreviewContext(uiRootAspectId, uiRoot, '', cache, logger);
   const results = await doBuild(context, outputPath);
   return results;
 }
