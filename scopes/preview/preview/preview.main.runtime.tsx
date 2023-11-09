@@ -19,8 +19,8 @@ import { CACHE_ROOT } from '@teambit/legacy/dist/constants';
 import { BitError } from '@teambit/bit-error';
 import objectHash from 'object-hash';
 import { uniq } from 'lodash';
-import { writeFileSync, existsSync, mkdirSync, readJsonSync, outputFileSync } from 'fs-extra';
-import { join, resolve } from 'path';
+import { writeFileSync, existsSync, mkdirSync } from 'fs-extra';
+import { join } from 'path';
 import { PkgAspect, PkgMain } from '@teambit/pkg';
 import { AspectLoaderAspect, getAspectDir, getAspectDirFromBvm } from '@teambit/aspect-loader';
 import type { AspectDefinition, AspectLoaderMain } from '@teambit/aspect-loader';
@@ -28,9 +28,8 @@ import WorkspaceAspect, { Workspace } from '@teambit/workspace';
 import { LoggerAspect, LoggerMain, Logger } from '@teambit/logger';
 import { DependencyResolverAspect } from '@teambit/dependency-resolver';
 import type { DependencyResolverMain } from '@teambit/dependency-resolver';
-import { createImports, getIdSetters, getIdentifiers } from '@teambit/ui/dist/create-root';
-import { getBundleArtifactDirectory } from '@teambit/ui/pre-bundle/util';
-import { sha1 } from '@teambit/legacy/dist/utils';
+import { useBuild } from '@teambit/ui/pre-bundle/build';
+import { getBundlePath } from '@teambit/ui/pre-bundle/util';
 import { ArtifactFiles } from '@teambit/legacy/dist/consumer/component/sources/artifact-files';
 import WatcherAspect, { WatcherMain } from '@teambit/watcher';
 import GraphqlAspect, { GraphqlMain } from '@teambit/graphql';
@@ -41,7 +40,8 @@ import { PreviewDefinition } from './preview-definition';
 import { PreviewAspect, PreviewRuntime } from './preview.aspect';
 import { PreviewRoute } from './preview.route';
 import { PreviewTask, PREVIEW_TASK_NAME } from './preview.task';
-import { PRE_BUNDLE_PREVIEW_DIR } from './pre-bundle-preview';
+import { PRE_BUNDLE_PREVIEW_DIR, getPreBundlePreviewContext } from './pre-bundle-preview';
+import { generateBundlePreviewEntry } from './bundle-preview';
 import { BundlingStrategy } from './bundling-strategy';
 import {
   EnvBundlingStrategy,
@@ -604,73 +604,29 @@ export class PreviewMain {
       this.executionRefs.set(ctxId, new ExecutionRef(context));
     });
 
-    // const previewRuntime = await this.writePreviewRuntime(context);
-    const customAspects = await this.getCustomAspects();
-    const previewRuntime = await this.writePreviewEntry(customAspects);
+    const previewRuntime = await this.writePreviewEntry();
     const linkFiles = await this.updateLinkFiles(context.components, context);
 
     return [...linkFiles, previewRuntime];
   }
 
-  private async getCustomAspects() {
-    const [, uiRoot] = this.getUi();
-    const resolvedAspects = await this.resolveAspects(PreviewRuntime.name, undefined, uiRoot);
-    const result = resolvedAspects.filter((aspect) => {
-      return !aspect.getId || !this.aspectLoader.isCoreAspect(aspect.getId);
-    });
-    return result;
-  }
+  private async writePreviewEntry() {
+    const { uiRoot, uiRootAspectId, logger, cache, harmonyConfig } = this.ui.getUiRootContext();
+    const publicDir = await this.ui.publicDir(uiRoot);
+    const context = await getPreBundlePreviewContext(uiRootAspectId, uiRoot, publicDir, cache, logger);
+    // TODO: set rebuild flag necessarily
+    await useBuild(context);
+    const preBundlePreviewPath = getBundlePath(uiRootAspectId, PRE_BUNDLE_PREVIEW_DIR, '');
+    const previewPreBundlePath = preBundlePreviewPath
+      ? join(preBundlePreviewPath, publicDir)
+      : // TODO: to be customizable to like `<workspace-root>/public/preview`
+        '<workspace-root>/public/preview';
 
-  private writePreviewEntry(customAspects: AspectDefinition[] = []) {
-    // TODO: check the availablility and validity of the preview pre-bundle
-
-    // - get preview bundle context
-    // const { uiRoot, uiRootAspectId, cache } = uiMain.getUiRootContext();
-    // getPreBundlePreviewContext(uiRootAspectId, uiRoot, '', cache, logger)
-
-    // - set rebuild flag necessarily
-    // ?
-
-    // - build
-    // await useBuild(context);
-
-    // - get the preview bundle path
-    // const bundleUiPath = getBundlePath(uiRootAspectId, BUNDLE_UI_DIR, BUNDLE_UIROOT_DIR[uiRootAspectId]);
-    // const bundleUiPublicPath = bundleUiPath ? join(bundleUiPath, publicDir) : undefined;
-    // const bundleUiRoot =
-    //   shouldSkipBuild && bundleUiPublicPath && existsSync(bundleUiPublicPath || '') ? bundleUiPublicPath : undefined;
-
-    const previewPathFromBvm = getAspectDirFromBvm(PreviewAspect.id);
-    const previewArtifactPath = getBundleArtifactDirectory(PRE_BUNDLE_PREVIEW_DIR, '');
-    // TODO: to be customizable to like `<workspace-root>/public/preview`
-    const previewPreBundlePath = join(previewPathFromBvm, previewArtifactPath);
-    const manifestPath = join(previewPreBundlePath, 'asset-manifest.json');
-    const manifest = readJsonSync(manifestPath);
-    const imports = manifest.entrypoints
-      .map((entry: string) =>
-        entry.endsWith('.js')
-          ? `import { run } from '${previewPreBundlePath}/${entry}';`
-          : `import '${previewPreBundlePath}/${entry}';`
-      )
-      .join('\n');
-    const name = this.workspace?.name || 'workspace';
-    const config = this.harmony.config.toObject();
-    config['teambit.harmony/bit'] = name;
-    const customImports = createImports(customAspects, true);
-    const customIdSetters = getIdSetters(customAspects, 'Aspect');
-    const customIdentifiers = getIdentifiers(customAspects, 'Aspect');
-
-    const contents = [
-      imports,
-      customImports,
-      customIdSetters.join('\n'),
-      `run(${JSON.stringify(config, null, 2)}, [${customIdentifiers.join('\n')}]);`,
-    ].join('\n');
-
-    const previewRuntime = resolve(join(__dirname, `preview.entry.${sha1(contents)}.js`));
-    if (!existsSync(previewRuntime)) {
-      outputFileSync(previewRuntime, contents);
-    }
+    const previewRuntime = await generateBundlePreviewEntry(
+      this.workspace?.name || 'workspace',
+      previewPreBundlePath,
+      harmonyConfig
+    );
     return previewRuntime;
   }
 
