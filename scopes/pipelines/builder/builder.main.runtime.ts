@@ -17,7 +17,8 @@ import { getHarmonyVersion } from '@teambit/legacy/dist/bootstrap';
 import findDuplications from '@teambit/legacy/dist/utils/array/find-duplications';
 import { GeneratorAspect, GeneratorMain } from '@teambit/generator';
 import { UIAspect, UiMain, BundleUiTask } from '@teambit/ui';
-import { PreBundlePreviewTask } from '@teambit/preview/dist/pre-bundle-preview.task';
+// import { PreBundlePreviewTask } from '@teambit/preview/dist/pre-bundle-preview.task';
+import { PreBundlePreviewTask } from '@teambit/preview';
 import { Artifact, ArtifactList, FsArtifact } from './artifact';
 import { ArtifactFactory } from './artifact/artifact-factory'; // it gets undefined when importing it from './artifact'
 import { BuilderAspect } from './builder.aspect';

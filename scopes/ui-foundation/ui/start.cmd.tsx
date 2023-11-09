@@ -6,7 +6,7 @@ import { UIServerConsole } from '@teambit/ui-foundation.cli.ui-server-console';
 import React from 'react';
 import openBrowser from 'react-dev-utils/openBrowser';
 import type { UiMain } from './ui.main.runtime';
-import { clearConsole } from './bundle/util';
+import { clearConsole } from './pre-bundle/util';
 
 type StartArgs = [userPattern: string];
 type StartFlags = {

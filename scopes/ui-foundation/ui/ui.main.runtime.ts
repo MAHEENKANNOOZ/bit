@@ -1,3 +1,5 @@
+/* eslint-disable no-console */
+
 import { existsSync } from 'fs';
 import { ComponentType } from 'react';
 import type { AspectMain } from '@teambit/aspect';
@@ -498,6 +500,14 @@ export class UiMain {
     path?: string,
     ignoreVersion?: boolean
   ) {
+    console.log('\n[UI.generateRoot]', {
+      rootExtensionName,
+      runtimeName,
+      rootAspect,
+      config,
+      path,
+      ignoreVersion,
+    });
     return generateBundleUIEntry(
       aspectDefs,
       rootExtensionName,

@@ -40,7 +40,12 @@ import { PreviewDefinition } from './preview-definition';
 import { PreviewAspect, PreviewRuntime } from './preview.aspect';
 import { PreviewRoute } from './preview.route';
 import { PreviewTask, PREVIEW_TASK_NAME } from './preview.task';
-import { PRE_BUNDLE_PREVIEW_DIR, getPreBundlePreviewContext } from './pre-bundle-preview';
+import {
+  PRE_BUNDLE_PREVIEW_DIR,
+  PRE_BUNDLE_PREVIEW_ID,
+  PRE_BUNDLE_PREVIEW_PUBLIC_DIR,
+  getPreBundlePreviewContext,
+} from './pre-bundle-preview';
 import { generateBundlePreviewEntry } from './bundle-preview';
 import { BundlingStrategy } from './bundling-strategy';
 import {
@@ -612,21 +617,15 @@ export class PreviewMain {
 
   private async writePreviewEntry() {
     const { uiRoot, uiRootAspectId, logger, cache, harmonyConfig } = this.ui.getUiRootContext();
-    const publicDir = await this.ui.publicDir(uiRoot);
-    const context = await getPreBundlePreviewContext(uiRootAspectId, uiRoot, publicDir, cache, logger);
+    const context = await getPreBundlePreviewContext(uiRootAspectId, uiRoot, cache, logger);
     // TODO: set rebuild flag necessarily
     await useBuild(context);
-    const preBundlePreviewPath = getBundlePath(uiRootAspectId, PRE_BUNDLE_PREVIEW_DIR, '');
+    const preBundlePreviewPath = getBundlePath(PRE_BUNDLE_PREVIEW_ID, PRE_BUNDLE_PREVIEW_DIR, '');
     const previewPreBundlePath = preBundlePreviewPath
-      ? join(preBundlePreviewPath, publicDir)
-      : // TODO: to be customizable to like `<workspace-root>/public/preview`
-        '<workspace-root>/public/preview';
+      ? join(preBundlePreviewPath, PRE_BUNDLE_PREVIEW_PUBLIC_DIR)
+      : join(uiRoot.path, PRE_BUNDLE_PREVIEW_PUBLIC_DIR);
 
-    const previewRuntime = await generateBundlePreviewEntry(
-      this.workspace?.name || 'workspace',
-      previewPreBundlePath,
-      harmonyConfig
-    );
+    const previewRuntime = await generateBundlePreviewEntry(uiRootAspectId, previewPreBundlePath, harmonyConfig);
     return previewRuntime;
   }
 

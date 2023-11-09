@@ -1,7 +1,8 @@
 import { Configuration, ProvidePlugin } from 'webpack';
 import { merge } from 'webpack-merge';
 import { fallbacksProvidePluginConfig } from '@teambit/webpack';
-import createBaseConfig from '@teambit/ui/dist/webpack/webpack.base.config';
+// import createBaseConfig from '@teambit/ui/dist/webpack/webpack.base.config';
+import { createBaseConfig } from '@teambit/ui';
 
 export default function createWebpackConfig(outputDir: string, entryFile: string): Configuration {
   const baseConfig = createBaseConfig(outputDir, entryFile);

@@ -1,23 +1,28 @@
+/* eslint-disable no-console */
+
 /**
  * @fileoverview
  */
-
-// TODO: debug: publicDir, dir, runtimeName, aspectId, rootAspect, rootExtensionName
 
 import { join, resolve } from 'path';
 import fs from 'fs-extra';
 import { AspectDefinition } from '@teambit/aspect-loader';
 import { CacheMain } from '@teambit/cache';
 import { Logger } from '@teambit/logger';
-import { UIRoot, UiMain } from '@teambit/ui';
-import { createImports, getIdSetters, getIdentifiers } from '@teambit/ui/dist/create-root';
+// import { UIRoot, UiMain } from '@teambit/ui';
+// import { createImports, getIdSetters, getIdentifiers } from '@teambit/ui/dist/create-root';
+import { UIRoot, UiMain, createImports, getIdSetters, getIdentifiers } from '@teambit/ui';
 import { PreBundleContext, doBuild } from '@teambit/ui/pre-bundle/build';
+import { sha1 } from '@teambit/legacy/dist/utils';
 import webpack from 'webpack';
 import { PreviewAspect } from './preview.aspect';
 import createPreBundleConfig from './webpack/webpack.prebundle.config';
 
+export const PRE_BUNDLE_PREVIEW_RUNTIME_NAME = 'preview';
 export const PRE_BUNDLE_PREVIEW_TASK_NAME = 'PreBundlePreview';
-export const PRE_BUNDLE_PREVIEW_DIR = 'preview-pre-bundle';
+export const PRE_BUNDLE_PREVIEW_ID = PreviewAspect.id;
+export const PRE_BUNDLE_PREVIEW_DIR = 'pre-bundle-preview';
+export const PRE_BUNDLE_PREVIEW_PUBLIC_DIR = 'public/bit-preview';
 
 const ENTRY_CONTENT_TEMPLATE = `__IMPORTS__
 
@@ -32,7 +37,7 @@ export const run = (config, customAspects = []) => {
         ...customAspects,
         __IDENTIFIERS__,
       ],
-      __RUNTIME__,
+      __RUNTIME_NAME__,
       mergedConfig
     ).then((harmony) => {
       return harmony
@@ -66,28 +71,35 @@ export const run = (config, customAspects = []) => {
     });
   }
 
-  if (isBrowser || __RUNTIME__ === "main") render();
+  if (isBrowser || __RUNTIME_NAME__ === "main") render();
 };
 `;
 
 export const generatePreBundlePreviewEntry = (
   aspectDefs: AspectDefinition[],
   rootExtensionName: string,
-  runtime: string,
-  rootAspect: string,
+  runtimeName: string,
+  rootAspectId: string,
   dir: string
 ) => {
-  const entryPath = resolve(join(dir, `pre-bundle-preview-entry.js`));
   const imports = createImports(aspectDefs);
   const identifiers = getIdentifiers(aspectDefs, 'Aspect');
   const idSetters = getIdSetters(aspectDefs, 'Aspect');
+  const contents = ENTRY_CONTENT_TEMPLATE.replace('__IMPORTS__', imports)
+    .replace('__IDENTIFIERS__', identifiers.join(', '))
+    .replace('__ID_SETTERS__', idSetters.join('\n'))
+    .replaceAll('__RUNTIME_NAME__', JSON.stringify(runtimeName))
+    .replaceAll('__ROOT_ASPECT__', JSON.stringify(rootAspectId))
+    .replaceAll('__ROOT_EXTENSION_NAME__', JSON.stringify(rootExtensionName));
+  const entryPath = resolve(join(dir, `pre-bundle-preview-entry.${sha1(contents)}.js`));
+  console.log('\n[generatePreBundlePreviewEntry]', {
+    rootExtensionName,
+    runtimeName,
+    rootAspectId,
+    dir,
+    entryPath,
+  });
   if (!fs.existsSync(entryPath)) {
-    const contents = ENTRY_CONTENT_TEMPLATE.replace('__IMPORTS__', imports)
-      .replace('__IDENTIFIERS__', identifiers.join(', '))
-      .replace('__ID_SETTERS__', idSetters.join('\n'))
-      .replaceAll('__RUNTIME__', JSON.stringify(runtime))
-      .replaceAll('__ROOT_ASPECT__', JSON.stringify(rootAspect))
-      .replaceAll('__ROOT_EXTENSION_NAME__', JSON.stringify(rootExtensionName));
     fs.outputFileSync(entryPath, contents);
   }
   return entryPath;
@@ -96,31 +108,41 @@ export const generatePreBundlePreviewEntry = (
 export async function getPreBundlePreviewContext(
   uiRootAspectId: string,
   uiRoot: UIRoot,
-  publicDir,
   cache: CacheMain,
   logger: Logger
 ): Promise<PreBundleContext> {
   const context: PreBundleContext = {
     config: {
-      runtime: 'preview',
-      aspectId: PreviewAspect.id,
+      runtime: PRE_BUNDLE_PREVIEW_RUNTIME_NAME,
+      bundleId: PRE_BUNDLE_PREVIEW_ID,
+      aspectId: uiRootAspectId,
       bundleDir: PRE_BUNDLE_PREVIEW_DIR,
       aspectDir: '',
-      publicDir,
+      publicDir: PRE_BUNDLE_PREVIEW_PUBLIC_DIR,
     },
     uiRoot,
     cache,
     logger,
-    getWebpackConfig: async (name: string, outputPath: string) => {
-      const resolvedAspects = await uiRoot.resolveAspects('preview');
+    getWebpackConfig: async (name: string, outputPath: string, localPublicDir: string) => {
+      const resolvedAspects = await uiRoot.resolveAspects(PRE_BUNDLE_PREVIEW_RUNTIME_NAME);
+      console.log('\n[getPreBundlePreviewContext.getWebpackConfig]', {
+        name,
+        outputPath,
+        localPublicDir,
+        uiRootAspectId,
+        __dirname,
+      });
+
       const mainEntry = generatePreBundlePreviewEntry(
         resolvedAspects,
+        PRE_BUNDLE_PREVIEW_ID,
+        PRE_BUNDLE_PREVIEW_RUNTIME_NAME,
         uiRootAspectId,
-        name,
-        PreviewAspect.id,
         __dirname
       );
-      const config = createPreBundleConfig(outputPath, mainEntry);
+
+      const config = createPreBundleConfig(resolve(outputPath, localPublicDir), mainEntry);
+
       return [config];
     },
   };
@@ -129,13 +151,15 @@ export async function getPreBundlePreviewContext(
 
 export async function buildPreBundlePreview(
   uiMain: UiMain,
-  logger: Logger,
   outputPath: string
 ): Promise<webpack.MultiStats | undefined> {
+  const { uiRoot, uiRootAspectId, logger, cache } = uiMain.getUiRootContext();
   logger.debug(`pre-bundle for preview: start`);
-  const { uiRoot, uiRootAspectId, cache } = uiMain.getUiRootContext();
-  // TODO: double-check
-  const context = await getPreBundlePreviewContext(uiRootAspectId, uiRoot, '', cache, logger);
+  console.log('\n[buildPreBundlePreview]', {
+    uiRootAspectId,
+    outputPath,
+  });
+  const context = await getPreBundlePreviewContext(uiRootAspectId, uiRoot, cache, logger);
   const results = await doBuild(context, outputPath);
   return results;
 }

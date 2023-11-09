@@ -1,3 +1,5 @@
+/* eslint-disable no-console */
+
 /**
  * @fileoverview
  */
@@ -10,15 +12,22 @@ import chalk from 'chalk';
 import { CacheMain } from '@teambit/cache';
 import { Logger } from '@teambit/logger';
 
-import { UIRoot } from '../ui-root';
 import { clearConsole, createBundleHash, readBundleHash } from './util';
+import { UIRoot } from '../ui-root';
 import { UnknownBuildError } from '../exceptions';
 
 export type PreBundleConfig = {
+  // e.g. 'ui'
   runtime: string;
+  // e.g. 'teambit.ui-foundation/ui'
+  bundleId: string;
+  // e.g. 'teambit.workspace/workspace'
   aspectId: string;
+  // e.g. 'ui-bundle'
   bundleDir: string;
+  // e.g. 'workspace'
   aspectDir: string;
+  // e.g. 'public/bit'
   publicDir: string;
 };
 
@@ -46,7 +55,7 @@ async function getShouldSkipBuild({
     return false;
   }
   const currentBundleUiHash = await createBundleHash(uiRoot, config.runtime);
-  const cachedBundleUiHash = readBundleHash(config.aspectId, config.bundleDir, config.aspectDir);
+  const cachedBundleUiHash = readBundleHash(config.bundleId, config.bundleDir, config.aspectDir);
   const isLocalBuildAvailable = existsSync(join(uiRoot.path, config.publicDir));
   return currentBundleUiHash === cachedBundleUiHash && !isLocalBuildAvailable;
 }
@@ -55,6 +64,13 @@ async function getShouldSkipBuild({
 export async function doBuild(context: PreBundleContext, customOutputPath?: string) {
   const { uiRoot, config, getWebpackConfig } = context;
   const outputPath = customOutputPath || uiRoot.path;
+  console.log('\n[doBuild]', {
+    uiRootName: uiRoot.name,
+    uiRootPath: uiRoot.path,
+    customOutputPath,
+    outputPath,
+    publicDir: config.publicDir,
+  });
 
   const webpackConfig = (await getWebpackConfig(uiRoot.name, outputPath, config.publicDir)) as webpack.Configuration[];
 
@@ -73,17 +89,18 @@ export async function doBuild(context: PreBundleContext, customOutputPath?: stri
 async function buildIfChanged(context: PreBundleContext): Promise<boolean> {
   const { config, uiRoot, cache, logger, shouldSkipBuild } = context;
 
-  logger.debug(`buildIfChanged, AspectId ${config.aspectId}`);
+  logger.debug(`buildIfChanged, AspectId ${config.bundleId}`);
 
   if (shouldSkipBuild) {
-    logger.debug(`buildIfChanged, AspectId ${config.aspectId}, returned from ui bundle cache`);
+    logger.debug(`buildIfChanged, AspectId ${config.bundleId}, returned from ui bundle cache`);
     return false;
   }
 
+  const cacheKey = `${uiRoot.path}#${config.runtime}`;
   const currentBuildUiHash = await createBundleHash(uiRoot, config.runtime);
-  const cachedBuildUiHash = await cache.get(uiRoot.path);
+  const cachedBuildUiHash = await cache.get(cacheKey);
   if (currentBuildUiHash === cachedBuildUiHash) {
-    logger.debug(`buildIfChanged, AspectId ${config.aspectId}, returned from ui build cache`);
+    logger.debug(`buildIfChanged, AspectId ${config.bundleId}, returned from ui build cache`);
     return false;
   }
 
@@ -102,7 +119,8 @@ async function buildIfChanged(context: PreBundleContext): Promise<boolean> {
   }
 
   await doBuild(context);
-  await cache.set(uiRoot.path, currentBuildUiHash);
+  await cache.set(cacheKey, currentBuildUiHash);
+
   return true;
 }
 
@@ -113,12 +131,13 @@ async function buildIfNoBundle(context: PreBundleContext): Promise<boolean> {
   if (pathExistsSync(outputPath)) return false;
   const hash = await createBundleHash(uiRoot, config.runtime);
   await doBuild(context);
-  await cache.set(uiRoot.path, hash);
+  const cacheKey = `${uiRoot.path}#${config.runtime}`;
+  await cache.set(cacheKey, hash);
   return true;
 }
 
 export async function useBuild(context: PreBundleContext): Promise<void> {
-  context.logger.debug(`buildUI, uiRootAspectId ${context.config.aspectId}`);
+  context.logger.debug(`buildUI, uiRootAspectId ${context.config.bundleId}`);
   context.shouldSkipBuild = await getShouldSkipBuild(context);
   await buildIfChanged(context);
   await buildIfNoBundle(context);

@@ -1,3 +1,5 @@
+/* eslint-disable no-console */
+
 /**
  * @fileoverview
  */
@@ -6,12 +8,20 @@ import { join } from 'path';
 import { BuildContext, BuildTask, BuiltTaskResult, TaskLocation } from '@teambit/builder';
 import { Capsule } from '@teambit/isolator';
 import { Logger } from '@teambit/logger';
-import { UIAspect, UiMain } from '@teambit/ui';
+import { UiMain } from '@teambit/ui';
 import { generateBundleHash, getBundleArtifactDef, getBundleArtifactDirectory } from './pre-bundle/util';
-import { BUNDLE_UIROOT_DIR, BUNDLE_UI_DIR, BUNDLE_UI_TASK_NAME, UIROOT_ASPECT_IDS, buildBundleUI } from './bundle-ui';
+import {
+  BUNDLE_UI_RUNTIME_NAME,
+  BUNDLE_UI_TASK_NAME,
+  BUNDLE_UI_ID,
+  BUNDLE_UIROOT_DIR,
+  UIROOT_ASPECT_IDS,
+  BUNDLE_UI_DIR,
+  buildBundleUI,
+} from './bundle-ui';
 
 export class BundleUiTask implements BuildTask {
-  aspectId = 'teambit.ui-foundation/ui';
+  aspectId = BUNDLE_UI_ID;
   name = BUNDLE_UI_TASK_NAME;
   location: TaskLocation = 'end';
 
@@ -19,15 +29,13 @@ export class BundleUiTask implements BuildTask {
 
   async execute(context: BuildContext): Promise<BuiltTaskResult> {
     const capsule: Capsule | undefined = context.capsuleNetwork.seedersCapsules.find(
-      (c) => c.component.id.toStringWithoutVersion() === UIAspect.id
+      (c) => c.component.id.toStringWithoutVersion() === BUNDLE_UI_ID
     );
     if (!capsule) {
       return { componentsResults: [] };
     }
 
-    const maybeUiRoot = this.ui.getUi();
-    if (!maybeUiRoot) throw new Error('no uiRoot found');
-    const [, uiRoot] = maybeUiRoot;
+    const { uiRoot } = this.ui.getUiRootContext();
 
     try {
       await Promise.all(
@@ -37,8 +45,14 @@ export class BundleUiTask implements BuildTask {
             getBundleArtifactDirectory(BUNDLE_UI_DIR, BUNDLE_UIROOT_DIR[uiRootAspectId])
           );
           this.logger.info(`Generating UI bundle at ${outputPath}...`);
-          await buildBundleUI(this.ui, uiRootAspectId, outputPath);
-          await generateBundleHash(uiRoot, 'ui', outputPath);
+          console.log('\n[BundleUiTask.execute]', {
+            uiAspectId: BUNDLE_UI_ID, // rootAspect
+            uiRootAspectId, // rootExtentionName
+            uiRootName: uiRoot.name,
+            outputPath,
+          });
+          await buildBundleUI(this.ui, BUNDLE_UI_ID, outputPath);
+          await generateBundleHash(uiRoot, BUNDLE_UI_RUNTIME_NAME, outputPath);
         })
       );
     } catch (error) {
@@ -46,12 +60,15 @@ export class BundleUiTask implements BuildTask {
       throw new Error('Generating UI bundle failed');
     }
 
-    return {
+    const results = {
       componentsResults: [],
       artifacts: [
         getBundleArtifactDef(BUNDLE_UI_DIR, BUNDLE_UIROOT_DIR[UIROOT_ASPECT_IDS.SCOPE]),
         getBundleArtifactDef(BUNDLE_UI_DIR, BUNDLE_UIROOT_DIR[UIROOT_ASPECT_IDS.WORKSPACE]),
       ],
     };
+    console.log('\n[BundleUiTask.execute] results', results);
+
+    return results;
   }
 }

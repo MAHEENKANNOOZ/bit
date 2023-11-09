@@ -16,8 +16,8 @@ export type UIRootRegistry = SlotRegistry<UIRoot>;
 
 export const BUNDLE_HASH_FILENAME = '.hash';
 
-export function readBundleHash(aspectId: string, bundleDir: string, aspectDir: string) {
-  const bundleUiPathFromBvm = getBundlePath(aspectId, bundleDir, aspectDir);
+export function readBundleHash(bundleId: string, bundleDir: string, aspectDir: string) {
+  const bundleUiPathFromBvm = getBundlePath(bundleId, bundleDir, aspectDir);
   if (!bundleUiPathFromBvm) {
     return '';
   }
@@ -57,9 +57,9 @@ export function getBundleArtifactDef(bundleDir: string, aspectDir: string): Arti
   };
 }
 
-export function getBundlePath(aspectId: string, bundleDir: string, aspectDir: string): string | undefined {
+export function getBundlePath(bundleId: string, bundleDir: string, aspectDir: string): string | undefined {
   try {
-    const dirFromBvms = getAspectDirFromBvm(aspectId);
+    const dirFromBvms = getAspectDirFromBvm(bundleId);
     return join(dirFromBvms, getBundleArtifactDirectory(bundleDir, aspectDir));
   } catch (err) {
     // TODO: logger -> move external

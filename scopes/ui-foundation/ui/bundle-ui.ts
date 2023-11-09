@@ -1,3 +1,5 @@
+/* eslint-disable no-console */
+
 /**
  * @fileoverview
  */
@@ -15,9 +17,12 @@ import { UIRoot } from './ui-root';
 import { PreBundleContext, doBuild } from './pre-bundle/build';
 import createWebpackConfig from './webpack/webpack.browser.config';
 import createSsrWebpackConfig from './webpack/webpack.ssr.config';
+import { UIAspect } from './ui.aspect';
 import { UiMain } from './ui.main.runtime';
 
+export const BUNDLE_UI_RUNTIME_NAME = 'ui';
 export const BUNDLE_UI_TASK_NAME = 'BundleUI';
+export const BUNDLE_UI_ID = UIAspect.id;
 export const BUNDLE_UI_DIR = 'ui-bundle';
 export const UIROOT_ASPECT_IDS = {
   SCOPE: 'teambit.scope/scope',
@@ -27,19 +32,31 @@ export const BUNDLE_UIROOT_DIR = {
   [UIROOT_ASPECT_IDS.SCOPE]: 'scope',
   [UIROOT_ASPECT_IDS.WORKSPACE]: 'workspace',
 };
-export const BUNDLE_UI_HASH_FILENAME = '.hash';
 
 export async function generateBundleUIEntry(
   aspectDefs: AspectDefinition[],
   rootExtensionName: string,
   runtimeName: string,
-  rootAspect: string,
-  config: object,
+  rootAspectId: string,
+  rootConfig: object,
   dir: string,
   ignoreVersion?: boolean
 ) {
-  const contents = await createRoot(aspectDefs, rootExtensionName, rootAspect, runtimeName, config, ignoreVersion);
-  const filepath = resolve(join(dir, `${runtimeName}.root${sha1(contents)}.js`));
+  console.log('\n[generateBundleUIEntry]', {
+    rootExtensionName,
+    runtimeName,
+    rootAspectId,
+    dir,
+  });
+  const contents = await createRoot(
+    aspectDefs,
+    rootExtensionName,
+    rootAspectId,
+    runtimeName,
+    rootConfig,
+    ignoreVersion
+  );
+  const filepath = resolve(join(dir, `${runtimeName}.root.${sha1(contents)}.js`));
   if (existsSync(filepath)) return filepath;
   outputFileSync(filepath, contents);
   return filepath;
@@ -57,8 +74,9 @@ export async function getBundleUIContext(
 
   const context: PreBundleContext = {
     config: {
+      runtime: BUNDLE_UI_RUNTIME_NAME,
+      bundleId: BUNDLE_UI_ID,
       aspectId: uiRootAspectId,
-      runtime: 'ui',
       bundleDir: BUNDLE_UI_DIR,
       aspectDir: BUNDLE_UIROOT_DIR[uiRootAspectId],
       publicDir,
@@ -67,19 +85,28 @@ export async function getBundleUIContext(
     logger,
     uiRoot,
     getWebpackConfig: async (name: string, outputPath: string, localPublicDir: string) => {
-      const entryPath = await generateBundleUIEntry(
-        await uiRoot.resolveAspects('ui'),
+      const resolvedAspects = await uiRoot.resolveAspects(BUNDLE_UI_RUNTIME_NAME);
+      console.log('\n[getBundleUIContext.getWebpackConfig]', {
+        name,
+        outputPath,
+        localPublicDir,
         uiRootAspectId,
-        'ui',
+        uiRootPath: uiRoot.path,
+      });
+      const entryPath = await generateBundleUIEntry(
+        resolvedAspects,
+        BUNDLE_UI_ID,
+        BUNDLE_UI_RUNTIME_NAME,
         uiRootAspectId,
         harmonyConfig,
-        uiRoot.path
+        __dirname
       );
 
       const browserConfig = createWebpackConfig(outputPath, [entryPath], name, localPublicDir);
       const ssrConfig = ssr && createSsrWebpackConfig(outputPath, [entryPath], localPublicDir);
 
       const config = [browserConfig, ssrConfig].filter((x) => !!x) as webpack.Configuration[];
+
       return config;
     },
   };
@@ -89,11 +116,17 @@ export async function getBundleUIContext(
 
 export async function buildBundleUI(
   uiMain: UiMain,
-  uiRootAspectIdOrName?: string,
+  uiRootAspectIdOrName: string | undefined,
   customOutputPath?: string
 ): Promise<webpack.MultiStats | undefined> {
   const { uiRootAspectId, uiRoot, logger, cache, harmonyConfig } = uiMain.getUiRootContext(uiRootAspectIdOrName);
   const publicDir = await uiMain.publicDir(uiRoot);
+  console.log('\n[buildBundleUI]', {
+    uiRootAspectId,
+    uiRootName: uiRoot.name,
+    publicDir,
+    customOutputPath,
+  });
   const context = await getBundleUIContext(uiRootAspectId, uiRoot, publicDir, cache, logger, harmonyConfig);
   context.forceRebuild = true;
   context.forceSkipBuild = false;
