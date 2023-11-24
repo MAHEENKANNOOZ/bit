@@ -4,6 +4,7 @@ import { BuildContext, BuildTask, BuiltTaskResult, TaskLocation } from '@teambit
 import { Capsule } from '@teambit/isolator';
 import { Logger } from '@teambit/logger';
 import { UIAspect, UiMain } from '@teambit/ui';
+import './foo';
 
 export const BUNDLE_UI_TASK_NAME = 'BundleUI';
 export const BUNDLE_UI_DIR = 'ui-bundle';
@@ -42,6 +43,8 @@ export class BundleUiTask implements BuildTask {
         })
       );
     } catch (error) {
+      console.log('\n[BUNDLE_UI_TASK_ERROR]');
+      console.log(error);
       this.logger.error('Generating UI bundle failed');
       throw new Error('Generating UI bundle failed');
     }
