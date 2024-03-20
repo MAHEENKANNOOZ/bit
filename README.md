@@ -136,7 +136,7 @@ Bit is entirely built with Bit and you can find all its components on [Bit Cloud
 
 <a href="../../graphs/contributors"><img src="https://opencollective.com/bit/contributors.svg?width=890&button=false" /></a>
 
-Your contribution, no matter how big or small, is much appreciated. Before contributing, please read the [code of conduct](CODE_OF_CONDUCT.md).
+Your contribution, no matter how big or small, is much appreciated. Before contributing, please read the [code_of conduct](CODE_OF_CONDUCT.md).
 
 See [Contributing](CONTRIBUTING.md).
 
