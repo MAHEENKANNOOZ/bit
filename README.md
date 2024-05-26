@@ -41,7 +41,7 @@ The core innovation of Bit is the ["Bit Component"](https://bit.dev/#component),
 
 ## Getting started
 
-### Install Bit
+## Install Bit
 
 Use the Bit installer to install Bit to be available on your PATH.
 
